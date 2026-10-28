@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room Splat XR</title>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+    "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/2.4.0/spark.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <h1>Room Splat XR</h1>
+  <p class="sub">Walk through a Gaussian splat of the room you are standing in.</p>
+
+  <section>
+    <h2>1 &middot; Splat</h2>
+
+    <div id="serverBox" class="hidden">
+      <div class="row"><label>On computer</label><select id="serverList"></select></div>
+      <div class="row btns"><button id="loadServer">Load</button><button id="refreshServer" class="ghost">Refresh list</button></div>
+      <p class="sep">or</p>
+    </div>
+
+    <label class="file"><input type="file" id="file"><span>Choose splat file (.ply .spz .sog .splat .ksplat)</span></label>
+    <label class="chk"><input type="checkbox" id="remember" checked> Remember this file on this device</label>
+    <div class="row"><input id="urlInput" type="url" placeholder="or paste a splat URL"><button id="loadUrl">Load</button></div>
+
+    <div id="status" class="status">No splat loaded.</div>
+    <div class="bar"><div id="prog"></div></div>
+  </section>
+
+  <section>
+    <h2>2 &middot; Reference points</h2>
+    <div class="row"><label>Orientation</label>
+      <select id="orient">
+        <option value="ydown">Y down (most splat files)</option>
+        <option value="yup">Y up</option>
+        <option value="zup">Z up</option>
+      </select>
+    </div>
+    <p class="hint">The floor should lie flat on the grid. If the room is upside down or on its side, change this.</p>
+    <div class="row btns"><button id="pickCorner">Pick corner</button><button id="pickWall">Pick wall point</button></div>
+    <p class="hint">Click a room corner <b>where it meets the floor</b>, then a point on the floor along <b>one</b> of its walls, 1.5 m or more away. Remember which corner and wall: you will touch the same ones in the headset.</p>
+    <div class="row btns"><button id="pickMeasure">Measure</button><input id="realDist" type="number" step="0.01" min="0" placeholder="real m"><button id="applyScale" disabled>Set scale</button></div>
+    <div id="measure" class="hint">Optional scale check: click two points you can measure in the real room (e.g. a door width), enter the real distance, then Set scale.</div>
+    <div class="row btns"><button id="frame">Frame view</button><button id="resetPrep" class="ghost">Reset</button><button id="copyLink" class="ghost">Copy link</button></div>
+    <p class="hint">These settings are saved on this device and in the page link. If you prepare on a computer, open the copied link on the Quest.</p>
+  </section>
+
+  <section>
+    <h2>3 &middot; Headset</h2>
+    <div class="row"><label>Render quality</label>
+      <select id="quality">
+        <option value="1">High</option>
+        <option value="0.85" selected>Balanced</option>
+        <option value="0.7">Fast</option>
+      </select>
+    </div>
+    <div class="row"><label>Splat detail</label>
+      <select id="detail">
+        <option value="0.6">Light</option>
+        <option value="1" selected>Standard</option>
+        <option value="1.5">High</option>
+      </select>
+    </div>
+    <button id="enter" class="primary" disabled>Enter headset</button>
+    <div id="xrmsg" class="hint">Checking WebXR...</div>
+    <button id="clearCalib" class="ghost small">Forget saved headset calibration</button>
+  </section>
+
+  <details>
+    <summary>Controls in the headset</summary>
+    <table>
+      <tr><td>B</td><td>Start calibration (touch corner, then wall)</td></tr>
+      <tr><td>Trigger</td><td>Capture the point under the glowing dot</td></tr>
+      <tr><td>A</td><td>Next view: Blend, Void, Ghost, Reality</td></tr>
+      <tr><td>X</td><td>Save calibration</td></tr>
+      <tr><td>Y</td><td>Show or hide help panel</td></tr>
+      <tr><td>Ghost: left stick</td><td>Move splat</td></tr>
+      <tr><td>Ghost: right stick</td><td>Rotate (left/right), height (up/down)</td></tr>
+      <tr><td>Ghost: R trigger + R stick</td><td>Scale</td></tr>
+      <tr><td>Hold grip</td><td>Precise, slow adjustment</td></tr>
+    </table>
+  </details>
+  <div id="version"></div>
+</div>
+
+<button id="toggleUi">Panel</button>
+<div id="pickHint"></div>
+<div id="legend"><span class="dot" style="background:#c6ff3d"></span>corner <span class="dot" style="background:#4fd8ff"></span>wall <span class="dot" style="background:#ffb347"></span>measure</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

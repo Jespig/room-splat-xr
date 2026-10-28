@@ -1,0 +1,10 @@
+# Splat files stay out of git by default (they are big and show your room).
+# Remove a line here only if you want a splat published with the site.
+splats/*
+!splats/README.md
+!splats/index.example.json
+*.ply
+
+node_modules/
+.DS_Store
+Thumbs.db

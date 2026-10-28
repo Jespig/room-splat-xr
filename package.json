@@ -1,0 +1,14 @@
+{
+  "name": "room-splat-xr",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Walk through a Gaussian splat of a room on Meta Quest 3 while standing in that room (three.js + Spark, WebXR).",
+  "type": "module",
+  "scripts": {
+    "start": "node server/serve.mjs",
+    "compress": "node tools/compress.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
