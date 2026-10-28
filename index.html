@@ -101,9 +101,11 @@
   <div class="qrCard">
     <canvas id="qrCanvas"></canvas>
     <label class="chk qrChk"><input type="checkbox" id="qrWithRef" checked> Include reference points</label>
+    <label class="chk qrChk"><input type="checkbox" id="qrSend" checked> Send the loaded splat to the headset</label>
+    <div id="qrSendStatus" class="qrSendStatus"></div>
     <p class="qrLabel">Or type this in the Quest browser:</p>
     <div id="qrShort" class="qrShort"></div>
-    <p class="hint qrHelp">Scanning needs a QR scanner app on the Quest (Horizon Store, e.g. "QR Scanner"); the built-in camera only reads Wi-Fi codes. Make this window big and bright and hold the screen 30 to 50 cm in front of the headset. With the short address, set the reference points again on the Quest.</p>
+    <p class="hint qrHelp">Scanning needs a QR scanner app on the Quest (Horizon Store, e.g. "QR Scanner"); the built-in camera only reads Wi-Fi codes. Make this window big and bright and hold the screen 30 to 50 cm in front of the headset. With the short address, set the reference points again on the Quest. The splat is sent directly from this browser to the headset (both need internet to connect; on the same Wi-Fi it is fastest).</p>
     <details class="qrMore"><summary>Full link</summary><div id="qrUrl" class="qrUrl"></div></details>
     <div class="row btns"><button id="qrCopy">Copy link</button><button id="qrClose" class="ghost">Close</button></div>
   </div>

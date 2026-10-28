@@ -4,11 +4,12 @@ import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFa
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import { Hud } from "./hud.js";
 import { cachePut, cacheGet, listRemoteSplats, formatBytes } from "./sources.js";
+import { startSender, receiveSplat } from "./transfer.js";
 
 /* ---------------------------------------------------------------
    Constants and state
 ---------------------------------------------------------------- */
-export const APP_VERSION = "0.3.1";
+export const APP_VERSION = "0.4.0";
 const LS_PREP = "roomsplat.prep.v1";
 const LS_CALIB = "roomsplat.calib.v1";
 const LS_LAST = "roomsplat.last.v1";
@@ -31,7 +32,7 @@ const ui = {
   pickMeasure: $("pickMeasure"), realDist: $("realDist"), applyScale: $("applyScale"), measure: $("measure"),
   frame: $("frame"), resetPrep: $("resetPrep"), copyLink: $("copyLink"), showQr: $("showQr"),
   qrModal: $("qrModal"), qrCanvas: $("qrCanvas"), qrUrl: $("qrUrl"), qrCopy: $("qrCopy"), qrClose: $("qrClose"),
-  qrShort: $("qrShort"), qrWithRef: $("qrWithRef"),
+  qrShort: $("qrShort"), qrWithRef: $("qrWithRef"), qrSend: $("qrSend"), qrSendStatus: $("qrSendStatus"),
   quality: $("quality"), detail: $("detail"), enter: $("enter"), xrmsg: $("xrmsg"), clearCalib: $("clearCalib"),
   panel: $("ui"), toggleUi: $("toggleUi"), pickHint: $("pickHint"), version: $("version"),
 };
@@ -43,6 +44,7 @@ let pickMode = null;       // 'corner' | 'wall' | 'm1' | 'm2'
 let xrSupport = { ar: false, vr: false };
 let remote = { source: "none", list: [] };
 let loadToken = 0;
+let current = null;          // { blob, url, name } of the loaded splat, used to send it to the headset
 
 function defaultPrep() {
   return { orient: "ydown", scale: 1, corner: null, wall: null, m1: null, m2: null, file: "" };
@@ -266,6 +268,7 @@ function loadLast() { try { return JSON.parse(localStorage.getItem(LS_LAST)); } 
 
 async function loadSplat({ url, blob, name }) {
   const token = ++loadToken;
+  current = { blob, url, name };
   if (splat) { prepGroup.remove(splat); try { splat.dispose(); } catch {} splat = null; }
   splatName = name;
   const sizeTxt = blob ? ` (${formatBytes(blob.size)})` : "";
@@ -365,8 +368,32 @@ ui.loadServer.onclick = () => {
   loadSplat({ url, name: entry?.name || nameFromUrl(url) });
 };
 
+// Headset side of "send to headset": the QR link carries #s=<sender id>
+async function receiveFromComputer(id) {
+  setStatus("Connecting to the computer...");
+  setProgress(0.02);
+  try {
+    const { blob, name } = await receiveSplat(id, ({ name, size, progress }) => {
+      setStatus(`Receiving ${name} (${formatBytes(size)}) from the computer... ${Math.round(progress * 100)}%`);
+      setProgress(progress);
+    });
+    if (ui.remember.checked) { const ok = await cachePut(name, blob); if (ok) saveLast({ type: "cache" }); }
+    await loadSplat({ blob, name });
+    return true;
+  } catch (err) {
+    console.warn(err);
+    setProgress(0);
+    history.replaceState(null, "", location.pathname + location.search + (prep.corner ? "#p=" + encodePrep() : ""));
+    setStatus(`Could not receive the splat: ${err.message || err}`, "err");
+    return false;
+  }
+}
+
 async function autoLoad() {
   await refreshRemote();
+
+  const send = location.hash.match(/[#&]s=([^&]+)/);
+  if (send && (await receiveFromComputer(decodeURIComponent(send[1])))) return;
 
   const param = new URLSearchParams(location.search).get("splat");
   if (param) return loadSplat({ url: param, name: nameFromUrl(param) });
@@ -427,7 +454,7 @@ ui.pickMeasure.onclick = () => {
   if (pickMode === "m1" || pickMode === "m2") return setPickMode(null);
   prep.m1 = prep.m2 = null; updateMarkers(); setPickMode("m1");
 };
-window.addEventListener("keydown", (e) => { if (e.key === "Escape") { setPickMode(null); ui.qrModal.classList.add("hidden"); } });
+window.addEventListener("keydown", (e) => { if (e.key === "Escape") { setPickMode(null); if (!ui.qrModal.classList.contains("hidden")) hideQr(); } });
 
 canvas.addEventListener("pointerdown", (e) => { downPos = [e.clientX, e.clientY]; });
 canvas.addEventListener("pointerup", (e) => {
@@ -487,9 +514,13 @@ ui.frame.onclick = () => frameView();
 // QR code of the page link, to open it on the Quest. Two variants:
 // with the reference points (compact #p= code) or just the short site address.
 const shortAddress = () => (location.host + location.pathname.replace(/index\.html$/, "")).replace(/\/$/, "");
+let sender = null, senderId = "";
 const qrLink = () => {
   const base = location.origin + location.pathname + location.search;
-  return ui.qrWithRef.checked && prep.corner ? base + "#p=" + encodePrep() : base;
+  const parts = [];
+  if (ui.qrWithRef.checked && prep.corner) parts.push("p=" + encodePrep());
+  if (ui.qrSend.checked && senderId) parts.push("s=" + senderId);
+  return parts.length ? base + "#" + parts.join("&") : base;
 };
 
 async function drawQr() {
@@ -514,17 +545,67 @@ async function drawQr() {
     ui.qrUrl.textContent = "Could not create the QR code (offline?). Link:\n" + url;
   }
 }
+
+function setSendStatus(text, cls = "") { ui.qrSendStatus.textContent = text; ui.qrSendStatus.className = "qrSendStatus " + cls; }
+
+// The file to send: the picked/cached file, or the URL the splat came from
+async function currentFile() {
+  if (current?.blob) return { blob: current.blob, name: current.name };
+  if (current?.url) {
+    const r = await fetch(current.url);
+    if (!r.ok) throw new Error("Could not read " + current.name);
+    return { blob: await r.blob(), name: current.name };
+  }
+  throw new Error("No splat loaded");
+}
+
+async function startSending() {
+  stopSending();
+  if (!ui.qrSend.checked || !current) return;
+  setSendStatus("Preparing...");
+  try {
+    sender = await startSender({
+      getFile: currentFile,
+      onStatus: ({ state, progress, error }) => {
+        if (state === "connected") setSendStatus("Headset connected, sending...");
+        else if (state === "sending") setSendStatus(`Sending to the headset... ${Math.round(progress * 100)}%  Keep this window open.`);
+        else if (state === "done") setSendStatus("Sent. The headset has the splat now.", "ok");
+        else if (state === "error") setSendStatus("Sending failed: " + error, "err");
+      },
+    });
+    senderId = sender.id;
+    setSendStatus(`Ready: scan the code with the headset. Keep this window open until the transfer is done.`);
+    drawQr();
+  } catch (err) {
+    console.warn(err);
+    setSendStatus("Could not start sending (offline?). You can still pick the file on the Quest.", "err");
+  }
+}
+function stopSending() {
+  if (sender) { sender.close(); sender = null; }
+  senderId = "";
+}
+
 function showQr() {
   ui.qrShort.textContent = shortAddress();
   ui.qrWithRef.checked = !!prep.corner;
   ui.qrWithRef.disabled = !prep.corner;
+  ui.qrSend.disabled = !current;
+  ui.qrSend.checked = !!current;
+  setSendStatus(current ? "" : "Load a splat first to send it along.");
   ui.qrModal.classList.remove("hidden");
   drawQr();
+  startSending();
+}
+function hideQr() {
+  ui.qrModal.classList.add("hidden");
+  stopSending();
 }
 ui.showQr.onclick = showQr;
 ui.qrWithRef.onchange = drawQr;
-ui.qrClose.onclick = () => ui.qrModal.classList.add("hidden");
-ui.qrModal.addEventListener("click", (e) => { if (e.target === ui.qrModal) ui.qrModal.classList.add("hidden"); });
+ui.qrSend.onchange = () => { if (ui.qrSend.checked) startSending(); else { stopSending(); setSendStatus(""); drawQr(); } };
+ui.qrClose.onclick = hideQr;
+ui.qrModal.addEventListener("click", (e) => { if (e.target === ui.qrModal) hideQr(); });
 ui.qrCopy.onclick = async () => {
   try { await navigator.clipboard.writeText(qrLink()); ui.qrCopy.textContent = "Copied"; }
   catch { prompt("Copy this link:", qrLink()); }

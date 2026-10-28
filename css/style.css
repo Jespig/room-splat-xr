@@ -80,3 +80,7 @@ kbd { background: #222730; border: 1px solid #343a45; border-radius: 4px; paddin
 .qrShort { font: 700 22px/1.3 ui-monospace, Menlo, Consolas, monospace; color: var(--accent); word-break: break-all; margin-bottom: 8px; }
 .qrHelp { text-align: left; }
 .qrMore { border: none; padding: 0; margin: 4px 0 8px; text-align: left; }
+.qrSendStatus { font-size: 13px; color: var(--accent2); min-height: 1.2em; margin: 2px 0 6px; }
+.qrSendStatus.ok { color: var(--accent); }
+.qrSendStatus.err { color: var(--warn); }
+.qrChk { margin: 6px 0 2px; }

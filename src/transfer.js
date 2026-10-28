@@ -1,0 +1,109 @@
+// Send the splat from the computer to the headset, browser to browser (WebRTC via PeerJS).
+// The computer opens a "sender" while the QR window is open; the QR link carries its id (#s=...).
+// The headset connects and receives the file directly. Only the connection setup goes through
+// the public PeerJS server; the file itself travels peer to peer (encrypted), usually inside your Wi-Fi.
+
+const PEER_URL = "https://cdn.jsdelivr.net/npm/peerjs@1.5.5/+esm";
+const CHUNK = 64 * 1024;            // size of one data channel message
+const READ = 4 * 1024 * 1024;       // bytes read from the file at a time
+const MAX_BUFFERED = 8 * 1024 * 1024;
+
+let PeerClass = null;
+async function loadPeer() {
+  if (!PeerClass) {
+    const m = await import(PEER_URL);
+    PeerClass = m.Peer || m.default;
+  }
+  return PeerClass;
+}
+
+function randomId(n = 10) {
+  const abc = "abcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(n));
+  return Array.from(bytes, (b) => abc[b % abc.length]).join("");
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Computer side. getFile() returns { blob, name }. onStatus({ state, progress, error }).
+export async function startSender({ getFile, onStatus }) {
+  const Peer = await loadPeer();
+  const id = "rsx-" + randomId();
+  const peer = new Peer(id, { debug: 0 });
+  let closed = false;
+  await new Promise((res, rej) => { peer.once("open", res); peer.once("error", rej); });
+
+  peer.on("connection", (conn) => {
+    conn.on("data", async (msg) => {
+      if (typeof msg !== "string") return;
+      let m; try { m = JSON.parse(msg); } catch { return; }
+      if (m.t !== "hello") return;
+      try {
+        onStatus({ state: "connected" });
+        const { blob, name } = await getFile();
+        conn.send(JSON.stringify({ t: "meta", name, size: blob.size }));
+        let sent = 0;
+        while (sent < blob.size) {
+          const end = Math.min(sent + READ, blob.size);
+          const buf = await blob.slice(sent, end).arrayBuffer();
+          for (let o = 0; o < buf.byteLength; o += CHUNK) {
+            if (closed || !conn.open) throw new Error("Connection closed");
+            while (conn.dataChannel && conn.dataChannel.bufferedAmount > MAX_BUFFERED) await sleep(8);
+            conn.send(buf.slice(o, o + CHUNK));
+          }
+          sent = end;
+          onStatus({ state: "sending", progress: sent / blob.size });
+        }
+        conn.send(JSON.stringify({ t: "end" }));
+        onStatus({ state: "done" });
+      } catch (e) {
+        onStatus({ state: "error", error: e.message || String(e) });
+      }
+    });
+  });
+  peer.on("error", (e) => { if (!closed) onStatus({ state: "error", error: e.type || e.message }); });
+
+  return { id, close() { closed = true; try { peer.destroy(); } catch {} } };
+}
+
+// Headset side. Resolves with { blob, name }. onStatus({ name, size, progress }).
+export async function receiveSplat(id, onStatus) {
+  const Peer = await loadPeer();
+  const peer = new Peer({ debug: 0 });
+  await new Promise((res, rej) => { peer.once("open", res); peer.once("error", rej); });
+
+  return new Promise((resolve, reject) => {
+    let meta = null, parts = [], partBytes = 0, blobs = [], got = 0, done = false;
+    const finish = (err, value) => {
+      if (done) return;
+      done = true; clearTimeout(timer);
+      setTimeout(() => { try { peer.destroy(); } catch {} }, 500);
+      err ? reject(err) : resolve(value);
+    };
+    const timer = setTimeout(() => finish(new Error("Computer not reachable. Is the QR window still open on the computer?")), 30000);
+
+    const conn = peer.connect(id, { serialization: "raw", reliable: true });
+    conn.on("open", () => conn.send(JSON.stringify({ t: "hello" })));
+    conn.on("data", (d) => {
+      if (typeof d === "string") {
+        let m; try { m = JSON.parse(d); } catch { return; }
+        if (m.t === "meta") { meta = m; clearTimeout(timer); onStatus({ name: m.name, size: m.size, progress: 0 }); }
+        else if (m.t === "end") {
+          if (parts.length) blobs.push(new Blob(parts));
+          const blob = new Blob(blobs);
+          if (meta && blob.size !== meta.size) finish(new Error(`Transfer incomplete (${blob.size} of ${meta.size} bytes)`));
+          else finish(null, { blob, name: meta ? meta.name : "splat.ply" });
+        }
+        return;
+      }
+      const size = d.byteLength ?? d.size ?? 0;
+      parts.push(d); partBytes += size; got += size;
+      // Group pieces into bigger blobs so the browser can move them out of memory
+      if (partBytes > 32 * 1024 * 1024) { blobs.push(new Blob(parts)); parts = []; partBytes = 0; }
+      if (meta) onStatus({ name: meta.name, size: meta.size, progress: got / meta.size });
+    });
+    conn.on("error", (e) => finish(e instanceof Error ? e : new Error(String(e))));
+    conn.on("close", () => finish(new Error("Connection closed before the file arrived")));
+    peer.on("error", (e) => finish(new Error(e.type === "peer-unavailable" ? "The QR code has expired. Open the QR window on the computer again and rescan." : (e.message || e.type))));
+  });
+}

@@ -85,7 +85,7 @@ This tells the app which corner of the scan is the origin. Easiest on a computer
 6. Optional scale check: press **Measure**, click two points you can also measure in reality (door width, table length), type the real distance in metres and press **Set scale**. LiDAR scans are usually right already, so only correct it if it is off by more than 1 to 2 cm.
 
 The settings are stored on the device and in the page link. To open the page on the Quest with these settings:
-- **QR code:** shows the link as a QR code. Scanning needs a QR scanner app from the Horizon Store (the built-in camera only reads Wi-Fi codes). Make the window big and bright and hold the screen 30 to 50 cm in front of the headset.
+- **QR code:** shows the link as a QR code. If a splat is loaded, it is **sent along**: keep the window open, scan the code with the headset, and the file goes straight from your computer's browser to the Quest (peer to peer, fastest on the same Wi-Fi; only the connection setup uses the public PeerJS server). The Quest keeps it, so next time it loads by itself. Scanning needs a QR scanner app from the Horizon Store (the built-in camera only reads Wi-Fi codes). Make the window big and bright and hold the screen 30 to 50 cm in front of the headset.
 - **Short address:** the same window shows the plain site address in large letters to type in the Quest browser (rename the Netlify site to something short, e.g. `roomsplat.netlify.app`). This opens the page without the reference points, so set them again on the Quest, which takes two clicks.
 - **Copy link:** send the full link to yourself.
 
@@ -139,6 +139,7 @@ css/style.css         page styles
 src/main.js           scene, loading, reference points, XR session, calibration, main loop
 src/hud.js            in-headset text panel
 src/sources.js        on-device cache, server list, manifest
+src/transfer.js       send a splat from computer to headset (WebRTC, PeerJS)
 server/serve.mjs      local server: app + splat folder, range requests, adb reverse
 tools/compress.mjs    .ply to .spz/.sog converter (splat-transform)
 splats/               your splats (ignored by git)
