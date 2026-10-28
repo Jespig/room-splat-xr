@@ -10,7 +10,8 @@
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
-    "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/2.4.0/spark.module.js"
+    "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/2.4.0/spark.module.js",
+    "qrcode-generator": "https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.mjs"
   }
 }
 </script>
@@ -53,8 +54,9 @@
     <p class="hint">Click a room corner <b>where it meets the floor</b>, then a point on the floor along <b>one</b> of its walls, 1.5 m or more away. Remember which corner and wall: you will touch the same ones in the headset.</p>
     <div class="row btns"><button id="pickMeasure">Measure</button><input id="realDist" type="number" step="0.01" min="0" placeholder="real m"><button id="applyScale" disabled>Set scale</button></div>
     <div id="measure" class="hint">Optional scale check: click two points you can measure in the real room (e.g. a door width), enter the real distance, then Set scale.</div>
-    <div class="row btns"><button id="frame">Frame view</button><button id="resetPrep" class="ghost">Reset</button><button id="copyLink" class="ghost">Copy link</button></div>
-    <p class="hint">These settings are saved on this device and in the page link. If you prepare on a computer, open the copied link on the Quest.</p>
+    <div class="row btns"><button id="frame">Frame view</button><button id="resetPrep" class="ghost">Reset</button></div>
+    <div class="row btns"><button id="copyLink" class="ghost">Copy link</button><button id="showQr" class="ghost">QR code</button></div>
+    <p class="hint">These settings are saved on this device and in the page link. If you prepare on a computer, open the link on the Quest: copy it, or show a QR code and scan it.</p>
   </section>
 
   <section>
@@ -93,6 +95,15 @@
     </table>
   </details>
   <div id="version"></div>
+</div>
+
+<div id="qrModal" class="hidden" role="dialog" aria-label="Link as QR code">
+  <div class="qrCard">
+    <canvas id="qrCanvas"></canvas>
+    <p class="qrTitle">Scan to open this page with the current reference points</p>
+    <div id="qrUrl" class="qrUrl"></div>
+    <div class="row btns"><button id="qrCopy">Copy link</button><button id="qrClose" class="ghost">Close</button></div>
+  </div>
 </div>
 
 <button id="toggleUi">Panel</button>

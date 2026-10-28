@@ -68,3 +68,11 @@ kbd { background: #222730; border: 1px solid #343a45; border-radius: 4px; paddin
 .hidden { display: none !important; }
 .sep { color: var(--muted); font-size: 12px; text-align: center; margin: 10px 0 2px; }
 #version { color: #5d646e; font-size: 11px; margin-top: 14px; }
+
+#qrModal { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 6, 8, 0.72); padding: 16px; }
+.qrCard { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; width: 380px; max-width: 100%; text-align: center; }
+#qrCanvas { width: 100%; max-width: 320px; aspect-ratio: 1; image-rendering: pixelated; border-radius: 10px; background: #fff; }
+.qrTitle { margin: 12px 0 6px; font-weight: 600; }
+.qrUrl { font: 11.5px/1.4 ui-monospace, Menlo, Consolas, monospace; color: var(--muted); word-break: break-all;
+  max-height: 72px; overflow-y: auto; background: #181b21; border-radius: 8px; padding: 8px; text-align: left; }

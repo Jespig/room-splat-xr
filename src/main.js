@@ -8,7 +8,7 @@ import { cachePut, cacheGet, listRemoteSplats, formatBytes } from "./sources.js"
 /* ---------------------------------------------------------------
    Constants and state
 ---------------------------------------------------------------- */
-export const APP_VERSION = "0.2.0";
+export const APP_VERSION = "0.3.0";
 const LS_PREP = "roomsplat.prep.v1";
 const LS_CALIB = "roomsplat.calib.v1";
 const LS_LAST = "roomsplat.last.v1";
@@ -29,7 +29,8 @@ const ui = {
   urlInput: $("urlInput"), loadUrl: $("loadUrl"),
   orient: $("orient"), pickCorner: $("pickCorner"), pickWall: $("pickWall"),
   pickMeasure: $("pickMeasure"), realDist: $("realDist"), applyScale: $("applyScale"), measure: $("measure"),
-  frame: $("frame"), resetPrep: $("resetPrep"), copyLink: $("copyLink"),
+  frame: $("frame"), resetPrep: $("resetPrep"), copyLink: $("copyLink"), showQr: $("showQr"),
+  qrModal: $("qrModal"), qrCanvas: $("qrCanvas"), qrUrl: $("qrUrl"), qrCopy: $("qrCopy"), qrClose: $("qrClose"),
   quality: $("quality"), detail: $("detail"), enter: $("enter"), xrmsg: $("xrmsg"), clearCalib: $("clearCalib"),
   panel: $("ui"), toggleUi: $("toggleUi"), pickHint: $("pickHint"), version: $("version"),
 };
@@ -393,7 +394,7 @@ ui.pickMeasure.onclick = () => {
   if (pickMode === "m1" || pickMode === "m2") return setPickMode(null);
   prep.m1 = prep.m2 = null; updateMarkers(); setPickMode("m1");
 };
-window.addEventListener("keydown", (e) => { if (e.key === "Escape") setPickMode(null); });
+window.addEventListener("keydown", (e) => { if (e.key === "Escape") { setPickMode(null); ui.qrModal.classList.add("hidden"); } });
 
 canvas.addEventListener("pointerdown", (e) => { downPos = [e.clientX, e.clientY]; });
 canvas.addEventListener("pointerup", (e) => {
@@ -449,6 +450,39 @@ ui.copyLink.onclick = async () => {
   setTimeout(() => (ui.copyLink.textContent = "Copy link"), 1500);
 };
 ui.frame.onclick = () => frameView();
+
+// QR code of the current page link (includes the reference points), to open it on the Quest
+async function showQr() {
+  const url = location.href;
+  ui.qrUrl.textContent = url;
+  ui.qrModal.classList.remove("hidden");
+  try {
+    const { qrcode } = await import("qrcode-generator");
+    const qr = qrcode(0, "M");
+    qr.addData(url, "Byte");
+    qr.make();
+    const n = qr.getModuleCount(), quiet = 4, size = n + quiet * 2;
+    const scale = Math.max(4, Math.floor(640 / size));
+    const cv = ui.qrCanvas;
+    cv.width = cv.height = size * scale;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = "#000";
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
+      if (qr.isDark(r, c)) ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+  } catch (err) {
+    console.warn(err);
+    ui.qrUrl.textContent = "Could not create the QR code (offline?). Link:\n" + url;
+  }
+}
+ui.showQr.onclick = showQr;
+ui.qrClose.onclick = () => ui.qrModal.classList.add("hidden");
+ui.qrModal.addEventListener("click", (e) => { if (e.target === ui.qrModal) ui.qrModal.classList.add("hidden"); });
+ui.qrCopy.onclick = async () => {
+  try { await navigator.clipboard.writeText(location.href); ui.qrCopy.textContent = "Copied"; }
+  catch { prompt("Copy this link:", location.href); }
+  setTimeout(() => (ui.qrCopy.textContent = "Copy link"), 1500);
+};
 
 function frameView() {
   if (!splat || !splat.isInitialized) return;
