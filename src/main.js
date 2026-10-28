@@ -9,7 +9,7 @@ import { startSender, receiveSplat } from "./transfer.js";
 /* ---------------------------------------------------------------
    Constants and state
 ---------------------------------------------------------------- */
-export const APP_VERSION = "0.4.0";
+export const APP_VERSION = "0.4.1";
 const LS_PREP = "roomsplat.prep.v1";
 const LS_CALIB = "roomsplat.calib.v1";
 const LS_LAST = "roomsplat.last.v1";
@@ -369,13 +369,20 @@ ui.loadServer.onclick = () => {
 };
 
 // Headset side of "send to headset": the QR link carries #s=<sender id>
+const RECEIVE_STEPS = {
+  1: "loading the connection library",
+  2: "reaching the PeerJS server",
+  3: "connecting to the computer",
+  4: "transferring the file",
+};
 async function receiveFromComputer(id) {
-  setStatus("Connecting to the computer...");
   setProgress(0.02);
   try {
-    const { blob, name } = await receiveSplat(id, ({ name, size, progress }) => {
-      setStatus(`Receiving ${name} (${formatBytes(size)}) from the computer... ${Math.round(progress * 100)}%`);
-      setProgress(progress);
+    const { blob, name } = await receiveSplat(id, ({ step, attempt, name, size, progress }) => {
+      if (step === 4 && name) {
+        setStatus(`Receiving ${name} (${formatBytes(size)}) from the computer... ${Math.round((progress || 0) * 100)}%`);
+        setProgress(progress || 0.02);
+      } else setStatus(`Step ${step}/4: ${RECEIVE_STEPS[step]}...${attempt > 1 ? ` (try ${attempt} of 3)` : ""}`);
     });
     if (ui.remember.checked) { const ok = await cachePut(name, blob); if (ok) saveLast({ type: "cache" }); }
     await loadSplat({ blob, name });
@@ -384,7 +391,8 @@ async function receiveFromComputer(id) {
     console.warn(err);
     setProgress(0);
     history.replaceState(null, "", location.pathname + location.search + (prep.corner ? "#p=" + encodePrep() : ""));
-    setStatus(`Could not receive the splat: ${err.message || err}`, "err");
+    const step = err.step ? `Step ${err.step}/4 (${RECEIVE_STEPS[err.step]}) failed:\n` : "";
+    setStatus(`Could not receive the splat.\n${step}${err.message || err}`, "err");
     return false;
   }
 }
