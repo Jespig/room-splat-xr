@@ -6,10 +6,10 @@ Built with three.js and [Spark](https://sparkjs.dev), runs in the Meta Quest Bro
 
 There are two ways to run it:
 
-| | **Local** (your computer) | **Online** (GitHub Pages) |
+| | **Local** (your computer) | **Online** (Netlify) |
 |---|---|---|
 | Splat size | Any, even multi-GB .ply files | Best under 100 MB (.spz/.sog) |
-| Splat stays private | Yes, never leaves your computer | No, the site and repo are public |
+| Splat stays private | Yes, never leaves your computer | Only if you don't publish it (anyone with the link can open the site) |
 | Needs | Node.js, adb, USB cable (or wireless adb) | Only the Quest |
 | Updates | Instantly on reload | About a minute after each push |
 
@@ -57,16 +57,16 @@ The server keeps the USB link alive automatically (it re-runs `adb reverse` ever
 
 ---
 
-## 2. Online setup (GitHub Pages)
+## 2. Online setup (Netlify)
 
-Every push to `main` updates the site at `https://<you>.github.io/room-splat-xr/`.
+The site is deployed by Netlify from this repo. Every push to `main` updates it after about a minute.
 
-1. Repo on GitHub, Settings, Pages: Source "Deploy from a branch", branch `main`, folder `/ (root)`.
-2. Open the Pages link in the Quest browser.
+1. One-time setup: app.netlify.com, Add new site, Import an existing project, GitHub, pick `room-splat-xr`. Branch `main`, build command empty, publish directory `.` (also set in `netlify.toml`).
+2. Open the Netlify link (Site configuration shows it, and lets you rename it) in the Quest browser.
 3. Load a splat:
    - **File picker:** copy the splat onto the Quest (USB, it shows up as a drive) and choose it. With "Remember this file" it is stored on the headset and loads automatically next time, without being copied into memory.
    - **URL:** paste a link to a splat (it must be https and allow cross-origin requests).
-   - **From your computer while the server runs:** with the Quest connected by adb, paste `http://localhost:8080/splats/room.ply` into the URL field. The hosted page loads the file straight from your computer.
+   - **From your computer while the server runs:** with the Quest connected by adb, paste `http://localhost:8080/splats/room.ply` into the URL field. The online page loads the file straight from your computer.
    - **Published with the site:** see `splats/README.md` (the splat becomes public).
 
 Tip: on the Quest, reload the page after pushing an update. The version number at the bottom of the panel shows which version is running.
@@ -144,11 +144,11 @@ splats/               your splats (ignored by git)
 ### Iterating
 - With `npm start` running, edit a file and reload the page on the Quest. App files are never cached by the local server.
 - Bump `APP_VERSION` in `src/main.js` when you push, so you can see on the Quest which version is running.
-- Commit and push: the online version updates by itself.
+- Commit and push (GitHub Desktop: Commit to main, Push origin): Netlify updates the online version by itself.
 
 ## Troubleshooting
 
-- **"WebXR needs a secure page"**: the page is not on https or localhost. Use `http://localhost:8080` via adb, or the GitHub Pages link.
+- **"WebXR needs a secure page"**: the page is not on https or localhost. Use `http://localhost:8080` via adb, or the Netlify link.
 - **Server says "Waiting for the Quest"**: check the cable, developer mode, and the USB debugging prompt inside the headset. `adb devices` should list the Quest.
 - **Room is upside down or on its side**: change Orientation, then pick the corner and wall again.
 - **Splat is rotated by about 90 degrees after calibration**: you touched the other wall of the corner. Recalibrate with the same wall as on the page.

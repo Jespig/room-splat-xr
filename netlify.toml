@@ -1,0 +1,10 @@
+# Netlify deploy settings: static site, no build step.
+[build]
+  publish = "."
+  command = ""
+
+# Always revalidate app files, so the Quest gets the newest version on reload.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
