@@ -8,7 +8,7 @@ import { cachePut, cacheGet, listRemoteSplats, formatBytes } from "./sources.js"
 /* ---------------------------------------------------------------
    Constants and state
 ---------------------------------------------------------------- */
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.3.1";
 const LS_PREP = "roomsplat.prep.v1";
 const LS_CALIB = "roomsplat.calib.v1";
 const LS_LAST = "roomsplat.last.v1";
@@ -31,6 +31,7 @@ const ui = {
   pickMeasure: $("pickMeasure"), realDist: $("realDist"), applyScale: $("applyScale"), measure: $("measure"),
   frame: $("frame"), resetPrep: $("resetPrep"), copyLink: $("copyLink"), showQr: $("showQr"),
   qrModal: $("qrModal"), qrCanvas: $("qrCanvas"), qrUrl: $("qrUrl"), qrCopy: $("qrCopy"), qrClose: $("qrClose"),
+  qrShort: $("qrShort"), qrWithRef: $("qrWithRef"),
   quality: $("quality"), detail: $("detail"), enter: $("enter"), xrmsg: $("xrmsg"), clearCalib: $("clearCalib"),
   panel: $("ui"), toggleUi: $("toggleUi"), pickHint: $("pickHint"), version: $("version"),
 };
@@ -134,7 +135,38 @@ ui.version.textContent = `v${APP_VERSION}`;
 ---------------------------------------------------------------- */
 const r5 = (a) => a && a.map((v) => Math.round(v * 1e5) / 1e5);
 
+// Compact link format, keeps the QR code small and easy to scan:
+//   #p=<orient>.<scale>.<corner x.y.z>.<wall x.y.z>.<file id>   numbers in base 36, 0.1 mm steps
+const enc36 = (v, k) => Math.round(v * k).toString(36);
+const dec36 = (t, k) => parseInt(t, 36) / k;
+const ORIENT_CODE = { ydown: "d", yup: "u", zup: "z" };
+function fileHash(name) {
+  let h = 0;
+  for (const ch of name || "") h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return (h % 1679616).toString(36); // at most 4 characters
+}
+
+function encodePrep() {
+  const pts = (a) => (a ? a.map((v) => enc36(v, 1e4)).join(".") : "_._._");
+  return [ORIENT_CODE[prep.orient] || "d", enc36(prep.scale, 1e5), pts(prep.corner), pts(prep.wall), prep.file ? fileHash(prep.file) : "_"].join(".");
+}
+
+function decodePrep(code) {
+  const t = code.split(".");
+  if (t.length !== 9) return null;
+  const orient = Object.keys(ORIENT_CODE).find((k) => ORIENT_CODE[k] === t[0]) || "ydown";
+  const pt = (i) => (t[i] === "_" ? null : [dec36(t[i], 1e4), dec36(t[i + 1], 1e4), dec36(t[i + 2], 1e4)]);
+  const scale = dec36(t[1], 1e5);
+  return { orient, scale: scale > 0 ? scale : 1, corner: pt(2), wall: pt(5), fileHash: t[8] === "_" ? "" : t[8] };
+}
+
 function loadPrep() {
+  // 1. Compact link (#p=...), 2. older long link (#prep=...), 3. this device
+  const mp = location.hash.match(/[#&]p=([^&]+)/);
+  if (mp) {
+    const d = decodePrep(decodeURIComponent(mp[1]));
+    if (d) { Object.assign(prep, d, { file: "" }); return; }
+  }
   let raw = null;
   const m = location.hash.match(/prep=([^&]+)/);
   if (m) { try { raw = JSON.parse(decodeURIComponent(m[1])); } catch {} }
@@ -150,8 +182,7 @@ function loadPrep() {
 function savePrep() {
   const p = { o: prep.orient, s: Math.round(prep.scale * 1e5) / 1e5, c: r5(prep.corner), w: r5(prep.wall), f: prep.file };
   try { localStorage.setItem(LS_PREP, JSON.stringify(p)); } catch {}
-  const url = location.pathname + location.search + "#prep=" + encodeURIComponent(JSON.stringify(p));
-  history.replaceState(null, "", url);
+  history.replaceState(null, "", location.pathname + location.search + "#p=" + encodePrep());
 }
 
 /* ---------------------------------------------------------------
@@ -244,10 +275,12 @@ async function loadSplat({ url, blob, name }) {
   updatePickButtons();
 
   // A different file than the one the reference was made for: keep orientation, reset the rest
-  if (prep.file && prep.file !== name) {
+  const otherFile = prep.file ? prep.file !== name : !!(prep.fileHash && prep.fileHash !== fileHash(name));
+  if (otherFile) {
     const o = prep.orient; prep = defaultPrep(); prep.orient = o;
   }
   prep.file = name;
+  prep.fileHash = "";
   ui.orient.value = prep.orient;
 
   const opts = {
@@ -451,18 +484,24 @@ ui.copyLink.onclick = async () => {
 };
 ui.frame.onclick = () => frameView();
 
-// QR code of the current page link (includes the reference points), to open it on the Quest
-async function showQr() {
-  const url = location.href;
+// QR code of the page link, to open it on the Quest. Two variants:
+// with the reference points (compact #p= code) or just the short site address.
+const shortAddress = () => (location.host + location.pathname.replace(/index\.html$/, "")).replace(/\/$/, "");
+const qrLink = () => {
+  const base = location.origin + location.pathname + location.search;
+  return ui.qrWithRef.checked && prep.corner ? base + "#p=" + encodePrep() : base;
+};
+
+async function drawQr() {
+  const url = qrLink();
   ui.qrUrl.textContent = url;
-  ui.qrModal.classList.remove("hidden");
   try {
     const { qrcode } = await import("qrcode-generator");
-    const qr = qrcode(0, "M");
+    const qr = qrcode(0, "L"); // low error correction = fewer, bigger squares, easier for the headset camera
     qr.addData(url, "Byte");
     qr.make();
     const n = qr.getModuleCount(), quiet = 4, size = n + quiet * 2;
-    const scale = Math.max(4, Math.floor(640 / size));
+    const scale = Math.max(4, Math.floor(720 / size));
     const cv = ui.qrCanvas;
     cv.width = cv.height = size * scale;
     const ctx = cv.getContext("2d");
@@ -475,12 +514,20 @@ async function showQr() {
     ui.qrUrl.textContent = "Could not create the QR code (offline?). Link:\n" + url;
   }
 }
+function showQr() {
+  ui.qrShort.textContent = shortAddress();
+  ui.qrWithRef.checked = !!prep.corner;
+  ui.qrWithRef.disabled = !prep.corner;
+  ui.qrModal.classList.remove("hidden");
+  drawQr();
+}
 ui.showQr.onclick = showQr;
+ui.qrWithRef.onchange = drawQr;
 ui.qrClose.onclick = () => ui.qrModal.classList.add("hidden");
 ui.qrModal.addEventListener("click", (e) => { if (e.target === ui.qrModal) ui.qrModal.classList.add("hidden"); });
 ui.qrCopy.onclick = async () => {
-  try { await navigator.clipboard.writeText(location.href); ui.qrCopy.textContent = "Copied"; }
-  catch { prompt("Copy this link:", location.href); }
+  try { await navigator.clipboard.writeText(qrLink()); ui.qrCopy.textContent = "Copied"; }
+  catch { prompt("Copy this link:", qrLink()); }
   setTimeout(() => (ui.qrCopy.textContent = "Copy link"), 1500);
 };
 

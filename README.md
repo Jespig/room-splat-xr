@@ -84,7 +84,10 @@ This tells the app which corner of the scan is the origin. Easiest on a computer
 5. **Write down which corner and which wall you chose.** You will touch exactly these in the headset. Pick a corner that is free of furniture and easy to reach.
 6. Optional scale check: press **Measure**, click two points you can also measure in reality (door width, table length), type the real distance in metres and press **Set scale**. LiDAR scans are usually right already, so only correct it if it is off by more than 1 to 2 cm.
 
-The settings are stored on the device and in the page link. To get the link onto the Quest, press **Copy link**, or **QR code** to show it as a QR code (the Quest needs a QR scanner app from the store for that, the built-in scanner only handles Wi-Fi codes).
+The settings are stored on the device and in the page link. To open the page on the Quest with these settings:
+- **QR code:** shows the link as a QR code. Scanning needs a QR scanner app from the Horizon Store (the built-in camera only reads Wi-Fi codes). Make the window big and bright and hold the screen 30 to 50 cm in front of the headset.
+- **Short address:** the same window shows the plain site address in large letters to type in the Quest browser (rename the Netlify site to something short, e.g. `roomsplat.netlify.app`). This opens the page without the reference points, so set them again on the Quest, which takes two clicks.
+- **Copy link:** send the full link to yourself.
 
 ## 4. Calibrate in the headset
 

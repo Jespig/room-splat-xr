@@ -97,11 +97,14 @@
   <div id="version"></div>
 </div>
 
-<div id="qrModal" class="hidden" role="dialog" aria-label="Link as QR code">
+<div id="qrModal" class="hidden" role="dialog" aria-label="Open on the Quest">
   <div class="qrCard">
     <canvas id="qrCanvas"></canvas>
-    <p class="qrTitle">Scan to open this page with the current reference points</p>
-    <div id="qrUrl" class="qrUrl"></div>
+    <label class="chk qrChk"><input type="checkbox" id="qrWithRef" checked> Include reference points</label>
+    <p class="qrLabel">Or type this in the Quest browser:</p>
+    <div id="qrShort" class="qrShort"></div>
+    <p class="hint qrHelp">Scanning needs a QR scanner app on the Quest (Horizon Store, e.g. "QR Scanner"); the built-in camera only reads Wi-Fi codes. Make this window big and bright and hold the screen 30 to 50 cm in front of the headset. With the short address, set the reference points again on the Quest.</p>
+    <details class="qrMore"><summary>Full link</summary><div id="qrUrl" class="qrUrl"></div></details>
     <div class="row btns"><button id="qrCopy">Copy link</button><button id="qrClose" class="ghost">Close</button></div>
   </div>
 </div>
